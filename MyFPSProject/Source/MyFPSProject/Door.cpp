@@ -117,7 +117,7 @@ void  ADoor::OnBoxOverlap(UPrimitiveComponent* OverlappedComponent, AActor* Othe
 	AMyFPSProjectCharacter* MyPawn = Cast<AMyFPSProjectCharacter>(OtherActor);
 	if (MyPawn)
 	{
-		//标志位为上升
+		//标志位为开门
 		IsDoorOpen = true;
 		//开启每帧更新
 		ADoor::SetActorTickEnabled(true);
@@ -131,7 +131,7 @@ void ADoor::OnBoxEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* Ot
 	AMyFPSProjectCharacter* MyPawn = Cast<AMyFPSProjectCharacter>(OtherActor);
 	if (MyPawn)
 	{
-		//标志位为上升
+		//标志位为开门
 		IsDoorOpen = false;
 		//开启每帧更新
 		ADoor::SetActorTickEnabled(true);

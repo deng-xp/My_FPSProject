@@ -29,7 +29,7 @@ AMyFPSProjectCharacter::AMyFPSProjectCharacter()
 	// Configure character movement
 	GetCharacterMovement()->bOrientRotationToMovement = true; // Character moves in the direction of input...	
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f); // ...at this rotation rate
-	GetCharacterMovement()->JumpZVelocity = 600.f;
+	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.2f;
 
 	// Create a camera boom (pulls in towards the player if there is a collision)
@@ -56,6 +56,7 @@ void AMyFPSProjectCharacter::SetupPlayerInputComponent(class UInputComponent* Pl
 	check(PlayerInputComponent);
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
+	//PlayerInputComponent->BindKey(EKeys::K, IE_Pressed, this, &ACharacter::Jump);[按键绑定成功；但要在“MyFPSProject.Bulid.cs文件中加"slate"]
 
 	PlayerInputComponent->BindAxis("MoveForward", this, &AMyFPSProjectCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AMyFPSProjectCharacter::MoveRight);
