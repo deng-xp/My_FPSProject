@@ -12,11 +12,28 @@ AFPSProjectile::AFPSProjectile()
 	//初始化碰撞组件
 	CollisionComponent=CreateDefaultSubobject<USphereComponent>(TEXT("Projectile"));
 	//初始化半径
-	CollisionComponent->InitSphereRadius(10.0f);	
+	CollisionComponent->InitSphereRadius(10.0f);
+	//用项目中预设的碰撞文件初始化碰撞
+	CollisionComponent->BodyInstance.SetCollisionProfileName(TEXT("Projectile"));
 	//将碰撞组件设置为根组件
 	RootComponent=CollisionComponent;
 	//初始化静态网格体组件
 	ProjectileMeshComponent=CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMeshComponent"));
+	static ConstructorHelpers::FObjectFinder<UStaticMeshComponent>Mesh(TEXT("'/Game/Geometry/Meshes/CubeMaterial.CubeMaterial'"));
+	if (Mesh.Succeeded())
+	{
+		ProjectileMeshComponent=Mesh.Object;
+	} 
+
+	//初始化发射物材质
+	//直接访问材质文件，并赋值
+	static ConstructorHelpers::FObjectFinder<UMaterial>Material(TEXT("'/Game/Materials/Projectile_Red.Projectile_Red'"));
+	if (Material.Succeeded())
+	{
+		//设置材质，并将其与发射物网格体组件绑定
+		ProjectileMaterialInstance=UMaterialInstanceDynamic::Create(Material.Object,ProjectileMeshComponent);
+	}
+	ProjectileMeshComponent->SetMaterial(0,ProjectileMaterialInstance);
 	ProjectileMeshComponent->SetupAttachment(RootComponent);
 
 	//通过发射物移动组件驱动发射物移动
@@ -47,7 +64,8 @@ AFPSProjectile::AFPSProjectile()
 void AFPSProjectile::BeginPlay()
 {
 	Super::BeginPlay();
-	
+	//绑定碰撞事件
+	CollisionComponent->OnComponentHit.AddDynamic(this,&AFPSProjectile::OnHit);
 }
 
 // Called every frame
@@ -61,4 +79,15 @@ void AFPSProjectile::Tick(float DeltaTime)
 void AFPSProjectile::FireInDirection(const FVector& ShootDirection)
 {
 	ProjectileMovementComponent->Velocity=ShootDirection*ProjectileMovementComponent->InitialSpeed;
+}
+
+//碰撞事件;参数中Hit存储碰撞发生位置等信息
+void AFPSProjectile::OnHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
+{
+	//保证不是发射物与发射物碰撞，且被击中的组件有开启物理模拟
+	if (OtherActor != this && OtherComp->IsSimulatingPhysics())
+	{
+		//在指定位置（Hit.ImpactPoint）施加特点大小的冲击（ProjectileMovementComponent->Velocity*100.0f）
+		OtherComp->AddImpulseAtLocation(ProjectileMovementComponent->Velocity*100.0f,Hit.ImpactPoint);
+	}
 }

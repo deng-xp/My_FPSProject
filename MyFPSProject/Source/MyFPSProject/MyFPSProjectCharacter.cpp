@@ -14,8 +14,18 @@
 
 AMyFPSProjectCharacter::AMyFPSProjectCharacter()
 {
+	//开启每帧调用
+	PrimaryActorTick.bCanEverTick = true;
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
+
+	//参数初始化
+	Health = 1.0f;
+	Energy = 1.0f;
+	ConsumeEnergyOfJump = 0.1f;
+	EnergyRegenerationRate = 0.005f;
+	WalkSpeed = 600.0f;
+	MaxSpeed = 1200.0f;
 
 	// set our turn rates for input
 	BaseTurnRate = 45.f;
@@ -48,16 +58,25 @@ AMyFPSProjectCharacter::AMyFPSProjectCharacter()
 }
 
 //////////////////////////////////////////////////////////////////////////
-// Input
+void AMyFPSProjectCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	//得到每帧速度
+	//WalkSpeed = WalkSpeed * (GetWorld()->GetDeltaSeconds());
+	//MaxSpeed = MaxSpeed * (GetWorld()->GetDeltaSeconds());
+	Speed=WalkSpeed;
+}
 
 void AMyFPSProjectCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
 {
 	// Set up gameplay key bindings
 	check(PlayerInputComponent);
-	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
+	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &AMyFPSProjectCharacter::StartJump);
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
 	//PlayerInputComponent->BindKey(EKeys::K, IE_Pressed, this, &ACharacter::Jump);[按键绑定成功；但要在“MyFPSProject.Bulid.cs文件中加"slate"]
 
+	PlayerInputComponent->BindAction("Run", IE_Pressed, this, &AMyFPSProjectCharacter::Run);
+	PlayerInputComponent->BindAction("Run", IE_Released, this, &AMyFPSProjectCharacter::StopRun);
 	PlayerInputComponent->BindAxis("MoveForward", this, &AMyFPSProjectCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AMyFPSProjectCharacter::MoveRight);
 
@@ -77,6 +96,83 @@ void AMyFPSProjectCharacter::SetupPlayerInputComponent(class UInputComponent* Pl
 	PlayerInputComponent->BindAction("ResetVR", IE_Pressed, this, &AMyFPSProjectCharacter::OnResetVR);
 }
 
+void AMyFPSProjectCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	if (Energy < 1.0)
+	{
+		//每帧回蓝energy
+		Energy += EnergyRegenerationRate * DeltaTime;
+		Energy = FMath::Clamp(Energy, 0.0f, 1.0f);
+	}
+}
+
+void AMyFPSProjectCharacter::StartJump()
+{
+	//能量足够时才能跳跃，且跳跃会耗能
+	if (Energy >= ConsumeEnergyOfJump)
+	{
+		bPressedJump = true;
+		JumpKeyHoldTime = 1.0f;
+		Energy = Energy - ConsumeEnergyOfJump;
+		Energy = FMath::Clamp(Energy, 0.0f, 1.0f);
+	}
+}
+
+void AMyFPSProjectCharacter::Run()
+{
+	Speed=MaxSpeed;
+}
+
+void AMyFPSProjectCharacter::StopRun()
+{
+	Speed=WalkSpeed;
+}
+
+void AMyFPSProjectCharacter::MoveForward(float Value)
+{
+	if ((Controller != nullptr) && (Value != 0.0f))
+	{
+		// find out which way is forward
+		const FRotator Rotation = Controller->GetControlRotation();
+		const FRotator YawRotation(0, Rotation.Yaw, 0);
+
+		// get forward vector
+		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+
+		float CurSpeed = AMyFPSProjectCharacter::GetMovementComponent()->GetMaxSpeed();
+		//加速跑要消耗能量
+		if (Speed == MaxSpeed)
+		{
+			if (Energy >= 0.09)
+			{
+				Energy-=0.0001;
+				Energy=FMath::Clamp(Energy,0.0f,1.0f);
+			}
+			else
+			{
+				Speed=WalkSpeed;
+			}
+		}
+		
+		AddMovementInput(Direction, Value);
+	}
+}
+
+void AMyFPSProjectCharacter::MoveRight(float Value)
+{
+	if ((Controller != nullptr) && (Value != 0.0f))
+	{
+		// find out which way is right
+		const FRotator Rotation = Controller->GetControlRotation();
+		const FRotator YawRotation(0, Rotation.Yaw, 0);
+
+		// get right vector 
+		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+		// add movement in that direction
+		AddMovementInput(Direction, Value);
+	}
+}
 
 void AMyFPSProjectCharacter::OnResetVR()
 {
@@ -91,12 +187,12 @@ void AMyFPSProjectCharacter::OnResetVR()
 
 void AMyFPSProjectCharacter::TouchStarted(ETouchIndex::Type FingerIndex, FVector Location)
 {
-		Jump();
+	Jump();
 }
 
 void AMyFPSProjectCharacter::TouchStopped(ETouchIndex::Type FingerIndex, FVector Location)
 {
-		StopJumping();
+	StopJumping();
 }
 
 void AMyFPSProjectCharacter::TurnAtRate(float Rate)
@@ -111,31 +207,4 @@ void AMyFPSProjectCharacter::LookUpAtRate(float Rate)
 	AddControllerPitchInput(Rate * BaseLookUpRate * GetWorld()->GetDeltaSeconds());
 }
 
-void AMyFPSProjectCharacter::MoveForward(float Value)
-{
-	if ((Controller != nullptr) && (Value != 0.0f))
-	{
-		// find out which way is forward
-		const FRotator Rotation = Controller->GetControlRotation();
-		const FRotator YawRotation(0, Rotation.Yaw, 0);
 
-		// get forward vector
-		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-		AddMovementInput(Direction, Value);
-	}
-}
-
-void AMyFPSProjectCharacter::MoveRight(float Value)
-{
-	if ( (Controller != nullptr) && (Value != 0.0f) )
-	{
-		// find out which way is right
-		const FRotator Rotation = Controller->GetControlRotation();
-		const FRotator YawRotation(0, Rotation.Yaw, 0);
-	
-		// get right vector 
-		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-		// add movement in that direction
-		AddMovementInput(Direction, Value);
-	}
-}

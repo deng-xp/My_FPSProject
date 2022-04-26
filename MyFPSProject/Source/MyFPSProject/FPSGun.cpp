@@ -17,7 +17,7 @@ AFPSGun::AFPSGun()
 	//参数初始化
 	Zoomtime = 0.3f;
 	IsZoom = false;
-	MuzzleOffset=FVector(60.0f,0.0f,-10.0f);
+	//MuzzleOffset=FVector(60.0f,0.0f,-10.0f);
 
 	//组件初始化
 	//盒体组件
@@ -119,6 +119,7 @@ void AFPSGun::Fire()
 		FRotator CameraRotation=GunCameraComponent->GetComponentRotation();
 		//GetActorEyesViewPoint(CameraLocation,CameraRotation);
 
+		MuzzleOffset.Set(62.0f,0.0f,0.0f);
 		//设置发射物生成位置（偏移位置是相对摄像机设计的，是在相机的坐标空间内，要将其转至世界坐标系）
 		FVector MuzzleLocation=CameraLocation+FTransform(CameraRotation).TransformVector(MuzzleOffset);
 		FRotator MuzzleRotation=CameraRotation;

@@ -29,7 +29,42 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Camera)
 	float BaseLookUpRate;
 
+	//生命值
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float Health;
+	//能量值
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float Energy;
+	//每秒自动回复的能量值
+	UPROPERTY(EditAnywhere)
+	float EnergyRegenerationRate;
+	//每一跳消耗的能力值
+	UPROPERTY(EditAnywhere)
+	float ConsumeEnergyOfJump;
+	//正常前进速度
+	UPROPERTY(EditAnywhere)
+	float WalkSpeed;
+	//加速时前进速度
+	UPROPERTY(EditAnywhere)
+	float MaxSpeed;
+	//当前速度
+	float Speed;
+	
+
 protected:
+
+	/*重新定义跳跃事件，方便对Energy进行处理*/
+	void StartJump();
+
+	/*每帧执行，自动回蓝*/
+	virtual void Tick(float DeltaTime) override;
+
+	virtual void BeginPlay() override;
+
+	/*加速跑*/
+	void Run();
+	/*停止加速跑*/
+	void StopRun();
 
 	/** Resets HMD orientation in VR. */
 	void OnResetVR();
