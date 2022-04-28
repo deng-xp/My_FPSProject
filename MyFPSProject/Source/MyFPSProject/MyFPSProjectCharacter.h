@@ -47,6 +47,9 @@ public:
 	//加速时前进速度
 	UPROPERTY(EditAnywhere)
 	float MaxSpeed;
+	//加速跑每秒消耗的蓝量
+	UPROPERTY(EditAnywhere)
+	float ConsumeEnergyOfRun;
 	//当前速度
 	float Speed;
 	
@@ -65,6 +68,7 @@ protected:
 	void Run();
 	/*停止加速跑*/
 	void StopRun();
+
 
 	/** Resets HMD orientation in VR. */
 	void OnResetVR();

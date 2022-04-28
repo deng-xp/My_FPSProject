@@ -9,6 +9,7 @@
 class UCameraComponent;
 class UBoxComponent;
 class USpringArmComponent;
+class AMyFPSProjectCharacter;
 UCLASS()
 class MYFPSPROJECT_API AFPSGun : public APawn
 {
@@ -45,19 +46,33 @@ public:
 	//发射物类型（只显示AFPSProjectile的子类与AFPSProjectile类）
 	UPROPERTY(EditDefaultsOnly,Category=Projectile)
 	TSubclassOf<class AFPSProjectile> ProjectileClass;
+	//声音组件（开炮时的炮声）
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	USoundBase* FireSound;
 
 	//输入变量
 	//记录视角旋转角度
 	FVector2D CameraInput;
 	//开镜时长
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Zoomtime;
 	//标记是否开镜
 	bool IsZoom;
 	//发射物射出位置相对相机的偏移量
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector MuzzleOffset;
+	//标记是否读取输入
+	bool Input;
+	//子弹数量
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int Ammo;
 
+protected:
+	//记录与FPSGun发生碰撞的角色，用于将角色切换回去
+	UPROPERTY()
+	AMyFPSProjectCharacter* OverLapFPSCharacter;
+
+protected:
 	//发射物发射函数，与Fire输入绑定
 	UFUNCTION()
 	void Fire();
@@ -69,4 +84,19 @@ public:
 	void ZoomIn();
 	//结束开镜
 	void ZoomOut();
+	//碰撞事件
+	UFUNCTION()
+	void OnBeginOverLap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	UFUNCTION()
+	void OnEndOverLap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+	//按下“Interaction”事件（控制炮台,表示"交互"事件）
+	UFUNCTION()
+	void AcquireController();
+	//显示准星UI的函数，在蓝图中实现
+	UFUNCTION(BlueprintImplementableEvent)
+	void DisplayUI();
+	//关闭UI
+	UFUNCTION(BlueprintImplementableEvent)
+	void CloseUI();
+
 };

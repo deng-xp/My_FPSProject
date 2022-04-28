@@ -2,10 +2,14 @@
 
 
 #include "FPSGun.h"
+#include "EngineUtils.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/BoxComponent.h"
 #include "Camera/CameraComponent.h"
 #include "FPSProjectile.h"
+#include "MyFPSProjectCharacter.h"
+#include "Kismet/GameplayStatics.h"
+#include "MyFPSProjectGameMode.h"
 #include "GameFramework/SpringArmComponent.h"
 
 // Sets default values
@@ -17,19 +21,20 @@ AFPSGun::AFPSGun()
 	//参数初始化
 	Zoomtime = 0.3f;
 	IsZoom = false;
-	//MuzzleOffset=FVector(60.0f,0.0f,-10.0f);
+	Input=false;
 
 	//组件初始化
 	//盒体组件
 	GunBoxComponent = CreateDefaultSubobject<UBoxComponent>(TEXT("GunBoxComponent"));
 	GunBoxComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	GunBoxComponent->SetCollisionResponseToAllChannels(ECR_Block);
-	GunBoxComponent->SetBoxExtent(FVector(50.0f, 20.0f, 20.0f));
+	GunBoxComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	GunBoxComponent->SetCollisionResponseToChannel(ECC_Pawn,ECR_Overlap);
+
+	GunBoxComponent->SetBoxExtent(FVector(60.0f, 20.0f, 20.0f));
 	if (RootComponent == nullptr)
 	{
 		RootComponent = GunBoxComponent;
 	}
-
 	//弹簧臂组件
 	CamerSpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("CamerSpringArm"));
 	CamerSpringArm->SetupAttachment(RootComponent);
@@ -59,7 +64,12 @@ AFPSGun::AFPSGun()
 void AFPSGun::BeginPlay()
 {
 	Super::BeginPlay();
-
+	//绑定重叠开始事件，开启输入
+	GunBoxComponent->OnComponentBeginOverlap.AddDynamic(this, &AFPSGun::OnBeginOverLap);
+	//绑定重叠结束事件，关闭输入
+	GunBoxComponent->OnComponentEndOverlap.AddDynamic(this, &AFPSGun::OnEndOverLap);
+	//子弹数量
+	Ammo=30;
 }
 
 // Called every frame
@@ -111,19 +121,21 @@ void AFPSGun::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 //发射物发射
 void AFPSGun::Fire()
 {
-	UE_LOG(LogTemp, Log, TEXT("On Fire"));
+	if (Ammo <= 0)
+	{
+		GEngine->AddOnScreenDebugMessage(1, 5.0f, FColor::Red, TEXT("Please replenish your ammunition"),false,FVector2D(1.5,1.5));
+		return;
+	}
 	if (ProjectileClass)
 	{
 		//获取相机的变换
 		FVector CameraLocation=GunCameraComponent->GetComponentLocation();
 		FRotator CameraRotation=GunCameraComponent->GetComponentRotation();
 		//GetActorEyesViewPoint(CameraLocation,CameraRotation);
-
 		MuzzleOffset.Set(62.0f,0.0f,0.0f);
 		//设置发射物生成位置（偏移位置是相对摄像机设计的，是在相机的坐标空间内，要将其转至世界坐标系）
 		FVector MuzzleLocation=CameraLocation+FTransform(CameraRotation).TransformVector(MuzzleOffset);
 		FRotator MuzzleRotation=CameraRotation;
-
 		//生成发射物
 		UWorld* World=GetWorld();
 		if (World)
@@ -140,10 +152,17 @@ void AFPSGun::Fire()
 				//设置发射物的轨迹（得到发射物发射的方向，传递至AFPSProjectile类中，用于设置初始速度）
 				FVector LauchDirection=MuzzleRotation.Vector();
 				Projectile->FireInDirection(LauchDirection);
+				//子弹数量减1
+				Ammo--;
+				UE_LOG(LogTemp, Log, TEXT("Ammo is: %i"),Ammo);
 			}
 		}
+		//添加声音
+		if (FireSound != nullptr)
+		{
+			UGameplayStatics::PlaySoundAtLocation(this,FireSound,GetActorLocation());
+		}
 	}
-
 }
 //摄像机上下转动
 void AFPSGun::PitchCamera(float AxisValue)
@@ -166,4 +185,49 @@ void AFPSGun::ZoomOut()
 {
 	//UE_LOG(LogTemp, Warning, TEXT("ZoomOut"));
 	IsZoom=false;
+}
+//开始重叠
+void AFPSGun::OnBeginOverLap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	UE_LOG(LogTemp, Warning, TEXT("Gun Begin Overlap"));
+	if (OtherActor != this)
+	{
+		AMyFPSProjectCharacter* OverLapCharacter=Cast<AMyFPSProjectCharacter,AActor>(OtherActor);
+		if (OverLapCharacter != nullptr)
+		{
+			//检测玩家控制器的输入(绑定控制Pawn切换的输入）
+			UGameplayStatics::GetPlayerController(GetWorld(), 0)->InputComponent->BindAction("Interaction", IE_Pressed,
+				this, &AFPSGun::AcquireController);
+			//记录导致重叠发生的角色
+			OverLapFPSCharacter= OverLapCharacter;
+		}
+	}
+}
+//重叠结束
+void AFPSGun::OnEndOverLap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	UE_LOG(LogTemp, Warning, TEXT("Gun end Overlap"));
+	//解除绑定 控制Pawn切换的输入
+	UGameplayStatics::GetPlayerController(GetWorld(), 0)->InputComponent->RemoveActionBinding("Interaction",IE_Pressed);
+}
+
+void AFPSGun::AcquireController()
+{
+	AGameModeBase* CurGameMode = UGameplayStatics::GetGameMode(GetWorld());
+	check(CurGameMode);
+	AMyFPSProjectGameMode* CurFPSGameMode = Cast<AMyFPSProjectGameMode, AGameModeBase>(CurGameMode);
+	//实现两个Pawn之间的来回切换
+	if (CurFPSGameMode)
+	{
+		if (UGameplayStatics::GetPlayerPawn(GetWorld(), 0) == this)
+		{
+			CloseUI();
+			CurFPSGameMode->ChangePawn<AMyFPSProjectCharacter>(OverLapFPSCharacter);
+		}
+		else
+		{
+			DisplayUI();
+			CurFPSGameMode->ChangePawn<AFPSGun>(this);
+		}
+	}
 }

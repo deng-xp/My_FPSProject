@@ -40,7 +40,11 @@ public:
 	//发射物材质（动态材质，可在运行中修改）
 	UPROPERTY(VisibleDefaultsOnly,Category=Projectile)
 	UMaterialInstanceDynamic* ProjectileMaterialInstance;
-
+	//粒子，命中物体后显示
+	UPROPERTY(EditAnywhere,BlueprintReadWrite)
+	UParticleSystem* FireParticle;
+	
+	
 	/****************成员函数*********************/
 	//初始化发射物的发射方向
 	void FireInDirection(const FVector& ShootDirection);

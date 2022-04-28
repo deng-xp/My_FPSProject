@@ -2,6 +2,7 @@
 
 
 #include "FPSProjectile.h"
+#include "Kismet/GameplayStatics.h"
 
 // Sets default values
 AFPSProjectile::AFPSProjectile()
@@ -49,13 +50,13 @@ AFPSProjectile::AFPSProjectile()
 		//子弹的旋转将在每一帧中更新，以匹配其速度
 		ProjectileMovementComponent->bRotationFollowsVelocity=true;
 		//设置反弹
-		ProjectileMovementComponent->bShouldBounce=true;
+		ProjectileMovementComponent->bShouldBounce=false;
 		//设置反弹系数，即反弹能力的强弱
 		ProjectileMovementComponent->Bounciness=0.3f;
 		//设置重力系数
 		ProjectileMovementComponent->ProjectileGravityScale=0.0f;
 		//设置生命周期（多久自动销毁）
-		InitialLifeSpan=3.0f;	//3秒后销毁
+		InitialLifeSpan=2.0f;	//2秒后销毁
 	}
 
 }
@@ -72,7 +73,11 @@ void AFPSProjectile::BeginPlay()
 void AFPSProjectile::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
+	//速度为0时销毁（为0表示已经发生碰撞了）
+	if (ProjectileMovementComponent->Velocity == FVector(0.0f))
+	{
+		this->Destroy();
+	}
 }
 
 //发射物速度（矢量，包含发射方向；参数ShootDirection由控制器得到输入）
@@ -84,10 +89,16 @@ void AFPSProjectile::FireInDirection(const FVector& ShootDirection)
 //碰撞事件;参数中Hit存储碰撞发生位置等信息
 void AFPSProjectile::OnHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-	//保证不是发射物与发射物碰撞，且被击中的组件有开启物理模拟
-	if (OtherActor != this && OtherComp->IsSimulatingPhysics())
+	//保证不是发射物与发射物碰撞，且被击中的组件有开启物理模拟时，施加冲击
+	if (OtherActor != this&& OtherComp->IsSimulatingPhysics())
 	{
 		//在指定位置（Hit.ImpactPoint）施加特点大小的冲击（ProjectileMovementComponent->Velocity*100.0f）
-		OtherComp->AddImpulseAtLocation(ProjectileMovementComponent->Velocity*100.0f,Hit.ImpactPoint);
+		OtherComp->AddImpulseAtLocation(ProjectileMovementComponent->Velocity * 100.0f, Hit.ImpactPoint);
+		//显示粒子效果
+		if (FireParticle != nullptr)
+		{
+			UGameplayStatics::SpawnEmitterAttached(FireParticle, OtherComp, "Fired");
+			//UGameplayStatics::SpawnEmitterAtLocation(GetWorld(),FireParticle,OtherActor->GetActorTransform());
+		}
 	}
 }

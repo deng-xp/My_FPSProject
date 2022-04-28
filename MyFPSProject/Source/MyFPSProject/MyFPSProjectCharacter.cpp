@@ -5,8 +5,10 @@
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
+#include "FPSGun.h"
 #include "GameFramework/SpringArmComponent.h"
 
 //////////////////////////////////////////////////////////////////////////
@@ -23,9 +25,11 @@ AMyFPSProjectCharacter::AMyFPSProjectCharacter()
 	Health = 1.0f;
 	Energy = 1.0f;
 	ConsumeEnergyOfJump = 0.1f;
+	ConsumeEnergyOfRun = 0.1f;
 	EnergyRegenerationRate = 0.005f;
 	WalkSpeed = 600.0f;
 	MaxSpeed = 1200.0f;
+	Speed = WalkSpeed;
 
 	// set our turn rates for input
 	BaseTurnRate = 45.f;
@@ -36,7 +40,7 @@ AMyFPSProjectCharacter::AMyFPSProjectCharacter()
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	// Configure character movement
+	// 配置角色运动信息
 	GetCharacterMovement()->bOrientRotationToMovement = true; // Character moves in the direction of input...	
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f); // ...at this rotation rate
 	GetCharacterMovement()->JumpZVelocity = 500.f;
@@ -61,10 +65,7 @@ AMyFPSProjectCharacter::AMyFPSProjectCharacter()
 void AMyFPSProjectCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	//得到每帧速度
-	//WalkSpeed = WalkSpeed * (GetWorld()->GetDeltaSeconds());
-	//MaxSpeed = MaxSpeed * (GetWorld()->GetDeltaSeconds());
-	Speed=WalkSpeed;
+	
 }
 
 void AMyFPSProjectCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
@@ -75,10 +76,13 @@ void AMyFPSProjectCharacter::SetupPlayerInputComponent(class UInputComponent* Pl
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
 	//PlayerInputComponent->BindKey(EKeys::K, IE_Pressed, this, &ACharacter::Jump);[按键绑定成功；但要在“MyFPSProject.Bulid.cs文件中加"slate"]
 
+	//绑定加速跑
 	PlayerInputComponent->BindAction("Run", IE_Pressed, this, &AMyFPSProjectCharacter::Run);
 	PlayerInputComponent->BindAction("Run", IE_Released, this, &AMyFPSProjectCharacter::StopRun);
 	PlayerInputComponent->BindAxis("MoveForward", this, &AMyFPSProjectCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AMyFPSProjectCharacter::MoveRight);
+
+
 
 	// We have 2 versions of the rotation bindings to handle different kinds of devices differently
 	// "turn" handles devices that provide an absolute delta, such as a mouse.
@@ -95,6 +99,7 @@ void AMyFPSProjectCharacter::SetupPlayerInputComponent(class UInputComponent* Pl
 	// VR headset functionality
 	PlayerInputComponent->BindAction("ResetVR", IE_Pressed, this, &AMyFPSProjectCharacter::OnResetVR);
 }
+
 
 void AMyFPSProjectCharacter::Tick(float DeltaTime)
 {
@@ -121,12 +126,12 @@ void AMyFPSProjectCharacter::StartJump()
 
 void AMyFPSProjectCharacter::Run()
 {
-	Speed=MaxSpeed;
+	Speed = MaxSpeed;
 }
 
 void AMyFPSProjectCharacter::StopRun()
 {
-	Speed=WalkSpeed;
+	Speed = WalkSpeed;
 }
 
 void AMyFPSProjectCharacter::MoveForward(float Value)
@@ -139,22 +144,26 @@ void AMyFPSProjectCharacter::MoveForward(float Value)
 
 		// get forward vector
 		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-
-		float CurSpeed = AMyFPSProjectCharacter::GetMovementComponent()->GetMaxSpeed();
-		//加速跑要消耗能量
+		
 		if (Speed == MaxSpeed)
 		{
-			if (Energy >= 0.09)
+			float consume = ConsumeEnergyOfRun * GetWorld()->DeltaTimeSeconds;
+			if (Energy >= consume)
 			{
-				Energy-=0.0001;
-				Energy=FMath::Clamp(Energy,0.0f,1.0f);
+				Energy = Energy - consume;
+				Energy = FMath::Clamp(Energy, 0.0f, 1.0f);
+				UE_LOG(LogTemp, Warning, TEXT("Current Energy is %f"), ConsumeEnergyOfRun);
 			}
 			else
 			{
-				Speed=WalkSpeed;
+				Speed = WalkSpeed;
 			}
 		}
+		//修改速度
+		GetCharacterMovement()->MaxWalkSpeed = Speed;
+
 		
+
 		AddMovementInput(Direction, Value);
 	}
 }
@@ -173,6 +182,19 @@ void AMyFPSProjectCharacter::MoveRight(float Value)
 		AddMovementInput(Direction, Value);
 	}
 }
+
+void AMyFPSProjectCharacter::TurnAtRate(float Rate)
+{
+	// calculate delta for this frame from the rate information
+	AddControllerYawInput(Rate * BaseTurnRate * GetWorld()->GetDeltaSeconds());
+}
+
+void AMyFPSProjectCharacter::LookUpAtRate(float Rate)
+{
+	// calculate delta for this frame from the rate information
+	AddControllerPitchInput(Rate * BaseLookUpRate * GetWorld()->GetDeltaSeconds());
+}
+
 
 void AMyFPSProjectCharacter::OnResetVR()
 {
@@ -195,16 +217,6 @@ void AMyFPSProjectCharacter::TouchStopped(ETouchIndex::Type FingerIndex, FVector
 	StopJumping();
 }
 
-void AMyFPSProjectCharacter::TurnAtRate(float Rate)
-{
-	// calculate delta for this frame from the rate information
-	AddControllerYawInput(Rate * BaseTurnRate * GetWorld()->GetDeltaSeconds());
-}
 
-void AMyFPSProjectCharacter::LookUpAtRate(float Rate)
-{
-	// calculate delta for this frame from the rate information
-	AddControllerPitchInput(Rate * BaseLookUpRate * GetWorld()->GetDeltaSeconds());
-}
 
 
